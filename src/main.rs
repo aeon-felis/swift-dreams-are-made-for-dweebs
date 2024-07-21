@@ -45,10 +45,7 @@ fn main() {
     ));
 
     if args.editor {
-        app.add_plugins((
-            YoleckPluginForEditor,
-            Vpeol3dPluginForEditor::sidescroller(),
-        ));
+        app.add_plugins((YoleckPluginForEditor, Vpeol3dPluginForEditor::topdown()));
     } else {
         app.add_plugins((YoleckPluginForGame, Vpeol3dPluginForGame));
         app.add_plugins(KbgpPlugin);

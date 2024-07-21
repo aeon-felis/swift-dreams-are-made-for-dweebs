@@ -3,17 +3,14 @@ use bevy_yoleck::vpeol::prelude::*;
 use dolly::prelude::*;
 
 use crate::player::IsPlayer;
-// use crate::During;
+use crate::During;
 
 pub struct SwiftDreamsAreMadeForDweebsCameraPlugin;
 
 impl Plugin for SwiftDreamsAreMadeForDweebsCameraPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_camera);
-        app.add_systems(
-            Update,
-            apply_dolly_camera_controls, /*.in_set(During::Gameplay)*/
-        );
+        app.add_systems(Update, apply_dolly_camera_controls.in_set(During::Gameplay));
     }
 }
 
@@ -23,12 +20,12 @@ struct CameraController(CameraRig);
 fn setup_camera(mut commands: Commands) {
     let mut cmd = commands.spawn_empty();
     cmd.insert(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, 3.0, 100.0)
+        transform: Transform::from_xyz(0.0, 20.0, 50.0)
             .looking_to(Vec3::new(0.0, -3.0, -10.0), Vec3::Y),
         ..Default::default()
     });
     cmd.insert(VpeolCameraState::default());
-    cmd.insert(Vpeol3dCameraControl::sidescroller());
+    cmd.insert(Vpeol3dCameraControl::topdown());
     cmd.insert(CameraController(
         CameraRig::builder()
             .with(Position::default())
