@@ -6,9 +6,9 @@
 
 use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
-use bevy_gltf_blueprints::BlueprintsPlugin;
-use bevy_gltf_components::ComponentsFromGltfPlugin;
+// use bevy_gltf_blueprints::BlueprintsPlugin;
 use bevy_registry_export::ExportRegistryPlugin;
+use blenvy::{BlenvyPlugin, BlueprintInfo, SpawnBlueprint};
 use swift_dreams_are_made_for_dweebs::SwiftDreamsAreMadeForDweebsPlugin;
 
 fn main() {
@@ -20,32 +20,48 @@ fn main() {
         meta_check: AssetMetaCheck::Never,
         ..default()
     }));
-    // app.add_plugins(ComponentsFromGltfPlugin::default());
-    app.add_plugins(BlueprintsPlugin {
-        legacy_mode: false,
-        // format: todo!(),
-        // library_folder: todo!(),
+    app.add_plugins(BlenvyPlugin {
+        // registry_save_path: todo!(),
+        // registry_component_filter: todo!(),
+        // registry_resource_filter: todo!(),
         // aabbs: todo!(),
-        // material_library: todo!(),
-        // material_library_folder: todo!(),
+        // save_component_filter: todo!(),
+        // save_resource_filter: todo!(),
         ..Default::default()
     });
+    // app.add_plugins(BlueprintsPlugin {
+        // legacy_mode: false,
+        // // format: todo!(),
+        // // library_folder: todo!(),
+        // library_folder: "library".into(),
+        // // aabbs: todo!(),
+        // // material_library: todo!(),
+        // // material_library_folder: todo!(),
+        // ..Default::default()
+    // });
     app.add_plugins(ExportRegistryPlugin::default());
     app.add_plugins(SwiftDreamsAreMadeForDweebsPlugin);
     app.add_systems(Startup, setup);
     app.run();
 }
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    // mut leak1: Local<Handle<Scene>>,
+    // mut leak2: Local<Handle<Scene>>,
+) {
     // TODO: load this from the scene file? Or maybe not
     //commands.spawn(Camera3dBundle {
         //transform: Transform::from_xyz(7.0, -6.0, 4.0).looking_at(Vec3::ZERO, Dir3::Y),
         //..Default::default()
     //});
-    commands.spawn(SceneBundle {
-        scene: asset_server.load("Level.glb#Scene0"),
-        ..Default::default()
-    });
+    // *leak1 = asset_server.load("levels/Level.glb#Scene0");
+    // *leak2 = asset_server.load("library/Player.glb#Scene0");
+    commands.spawn((
+            BlueprintInfo::from_path("levels/Level.glb"),
+            SpawnBlueprint,
+    ));
     // commands.spawn(bevy_gltf_blueprints::BluePrintBundle {
         // blueprint: bevy_gltf_blueprints::BlueprintName("Level.glb")
         // spawn_here: bevy_gltf_blueprints::SpawnHere,

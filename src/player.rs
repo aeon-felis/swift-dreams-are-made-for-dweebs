@@ -14,8 +14,12 @@ impl Plugin for PlayerPlugin {
 #[reflect(Component, Serialize, Deserialize)]
 pub struct IsPlayer;
 
-fn temp_notice_player_name(query: Query<&Name, Added<IsPlayer>>) {
-    for name in query.iter() {
-        info!("{:?} is a player", name);
+fn temp_notice_player_name(
+    query: Query<(Entity, &Name, (&Visibility, &ViewVisibility, &InheritedVisibility)), With<IsPlayer>>,
+    // mut commands: Commands,
+) {
+    for (entity, name, vis) in query.iter() {
+        info!("{} {:?} is a player ({:?})", entity, name, vis);
+        // commands.entity(entity).log_components();
     }
 }
