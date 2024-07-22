@@ -1,12 +1,18 @@
 use arena::ArenaPlugin;
+use bed::BedPlugin;
 use bevy::prelude::*;
 use bevy_yoleck::prelude::*;
 use camera::SwiftDreamsAreMadeForDweebsCameraPlugin;
+use dweeb::DweebPlugin;
+use dweeb_behavior::DweebBehaviorPlugin;
 use player::PlayerPlugin;
 use player_controls::PlayerControlsPlugin;
 
 mod arena;
+mod bed;
 mod camera;
+mod dweeb;
+mod dweeb_behavior;
 mod player;
 mod player_controls;
 mod util;
@@ -58,7 +64,14 @@ impl Plugin for SwiftDreamsAreMadeForDweebsPlugin {
             );
             app.insert_state(AppState::Game);
         }
-        app.add_plugins((ArenaPlugin, PlayerPlugin, PlayerControlsPlugin));
+        app.add_plugins((
+            ArenaPlugin,
+            BedPlugin,
+            DweebPlugin,
+            DweebBehaviorPlugin,
+            PlayerPlugin,
+            PlayerControlsPlugin,
+        ));
 
         app.add_systems(Update, enable_disable_physics);
     }
