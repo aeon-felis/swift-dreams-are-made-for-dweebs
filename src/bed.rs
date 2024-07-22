@@ -13,7 +13,7 @@ impl Plugin for BedPlugin {
         app.add_yoleck_entity_type({
             YoleckEntityType::new("Bed")
                 .with::<Vpeol3dPosition>()
-                .insert_on_init(|| Bed { _occupied_by: None })
+                .insert_on_init(|| Bed { occupied_by: None })
         });
         affix_vpeol_y::<With<Bed>>(app, 2.0);
         app.add_systems(YoleckSchedule::Populate, populate_bed);
@@ -22,7 +22,7 @@ impl Plugin for BedPlugin {
 
 #[derive(Component)]
 pub struct Bed {
-    _occupied_by: Option<Entity>,
+    pub occupied_by: Option<Entity>,
 }
 
 fn populate_bed(mut pupulate: YoleckPopulate<(), With<Bed>>, asset_server: Res<AssetServer>) {
