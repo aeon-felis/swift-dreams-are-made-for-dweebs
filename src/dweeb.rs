@@ -6,7 +6,7 @@ use bevy_yoleck::{
     prelude::*, vpeol::VpeolWillContainClickableChildren, vpeol_3d::Vpeol3dPosition,
 };
 
-use crate::util::affix_vpeol_y;
+use crate::{player_controls::PotentialAttackTarget, util::affix_vpeol_y};
 
 pub struct DweebPlugin;
 
@@ -15,7 +15,14 @@ impl Plugin for DweebPlugin {
         app.add_yoleck_entity_type({
             YoleckEntityType::new("Dweeb")
                 .with::<Vpeol3dPosition>()
-                .insert_on_init(|| Dweeb {})
+                .insert_on_init(|| {
+                    (
+                        Dweeb {},
+                        PotentialAttackTarget {
+                            offset: 0.5 * Vec3::Y,
+                        },
+                    )
+                })
         });
         affix_vpeol_y::<With<Dweeb>>(app, 2.0);
         app.add_systems(YoleckSchedule::Populate, populate_dweeb);
