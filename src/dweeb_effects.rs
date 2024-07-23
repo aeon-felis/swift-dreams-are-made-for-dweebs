@@ -1,6 +1,10 @@
-use std::mem::{self, Discriminant};
+use std::{
+    mem::{self, Discriminant},
+    time::Duration,
+};
 
 use bevy::prelude::*;
+use bevy_turborand::prelude::*;
 
 use crate::dweeb::Dweeb;
 
@@ -9,7 +13,10 @@ pub struct DweebEffectsPlugin;
 impl Plugin for DweebEffectsPlugin {
     fn build(&self, app: &mut App) {
         app.observe(add_effect_to_dweeb);
-        app.add_systems(Update, (handle_effect_discriminant_changes, handle_effect_particles));
+        app.add_systems(
+            Update,
+            (handle_effect_discriminant_changes, handle_effect_particles),
+        );
     }
 }
 
@@ -23,7 +30,7 @@ fn add_effect_to_dweeb(trigger: Trigger<OnInsert, Dweeb>, mut commands: Commands
 #[derive(Component)]
 pub enum DweebEffect {
     None,
-    Zs,
+    Zs { is_rem: bool },
 }
 
 #[derive(Component)]
@@ -33,6 +40,7 @@ fn handle_effect_discriminant_changes(
     mut query: Query<(Entity, &DweebEffect, &mut OldEffect)>,
     particles_query: Query<(Entity, &EffectParticle)>,
     mut commands: Commands,
+    mut global_rng: ResMut<GlobalRng>,
     asset_server: Res<AssetServer>,
 ) {
     for (entity, effect, mut old) in query.iter_mut() {
@@ -50,14 +58,24 @@ fn handle_effect_discriminant_changes(
 
         match effect {
             DweebEffect::None => {}
-            DweebEffect::Zs => {
+            DweebEffect::Zs { .. } => {
                 commands.spawn((
                     SceneBundle {
                         scene: asset_server.load("Z.glb#Scene0"),
                         transform: Transform::from_xyz(0.0, -4.0, 0.0),
                         ..Default::default()
                     },
-                    EffectParticle { owner: entity },
+                    EffectParticle {
+                        owner: entity,
+                        timer: {
+                            let mut timer = Timer::new(
+                                Duration::from_secs_f32(2.0 + 0.5 * global_rng.f32_normalized()),
+                                TimerMode::Repeating,
+                            );
+                            timer.set_elapsed(timer.duration().mul_f32(global_rng.f32()));
+                            timer
+                        },
+                    },
                 ));
             }
         }
@@ -67,14 +85,17 @@ fn handle_effect_discriminant_changes(
 #[derive(Component)]
 struct EffectParticle {
     owner: Entity,
+    timer: Timer,
 }
 
 fn handle_effect_particles(
-    mut query: Query<(Entity, &EffectParticle, &mut Transform)>,
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut EffectParticle, &mut Transform)>,
     owners_query: Query<(&DweebEffect, &GlobalTransform)>,
     mut commands: Commands,
+    mut global_rng: ResMut<GlobalRng>,
 ) {
-    for (particle_entity, particle, mut particle_transform) in query.iter_mut() {
+    for (particle_entity, mut particle, mut particle_transform) in query.iter_mut() {
         let Ok((effect, owner_transform)) = owners_query.get(particle.owner) else {
             commands.entity(particle_entity).despawn_recursive();
             continue;
@@ -83,8 +104,25 @@ fn handle_effect_particles(
             DweebEffect::None => {
                 commands.entity(particle_entity).despawn_recursive();
             }
-            DweebEffect::Zs => {
-                particle_transform.translation = owner_transform.translation() + 1.0 * Vec3::Y;
+            DweebEffect::Zs { is_rem } => {
+                let time_multiplier = if *is_rem {
+                    10.0 + 2.0 * global_rng.f32_normalized()
+                } else {
+                    1.0
+                };
+                let timer_progress = particle
+                    .timer
+                    .tick(time.delta().mul_f32(time_multiplier))
+                    .elapsed_secs()
+                    / particle.timer.duration().as_secs_f32();
+                let animation_progress = 2.0
+                    * if timer_progress < 0.5 {
+                        timer_progress
+                    } else {
+                        1.0 - timer_progress
+                    };
+                particle_transform.translation =
+                    owner_transform.translation() + (1.0 + 0.2 * animation_progress) * Vec3::Y;
             }
         }
     }

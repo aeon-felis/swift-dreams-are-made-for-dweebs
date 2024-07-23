@@ -9,6 +9,7 @@ use bevy_egui::EguiPlugin;
 use bevy_egui_kbgp::{KbgpNavBindings, KbgpPlugin, KbgpSettings};
 use bevy_tnua::controller::TnuaControllerPlugin;
 use bevy_tnua_avian3d::TnuaAvian3dPlugin;
+use bevy_turborand::prelude::RngPlugin;
 use bevy_yoleck::vpeol_3d::{Vpeol3dPluginForEditor, Vpeol3dPluginForGame};
 use bevy_yoleck::{YoleckPluginForEditor, YoleckPluginForGame};
 use clap::Parser;
@@ -43,6 +44,7 @@ fn main() {
         TnuaControllerPlugin::default(),
         TnuaAvian3dPlugin::default(),
     ));
+    app.add_plugins(RngPlugin::default());
 
     if args.editor {
         app.add_plugins((YoleckPluginForEditor, Vpeol3dPluginForEditor::topdown()));

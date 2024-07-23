@@ -69,11 +69,11 @@ impl Plugin for SwiftDreamsAreMadeForDweebsPlugin {
         app.add_plugins((
             ArenaPlugin,
             BedPlugin,
-            DweebPlugin,
             DweebBehaviorPlugin,
             DweebEffectsPlugin,
-            PlayerPlugin,
+            DweebPlugin,
             PlayerControlsPlugin,
+            PlayerPlugin,
         ));
 
         app.add_systems(Update, enable_disable_physics);

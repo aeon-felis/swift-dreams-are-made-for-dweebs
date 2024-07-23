@@ -14,7 +14,7 @@ fn setup_arena(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    const SIZE: Vec3 = Vec3::new(40.0, 1.0, 40.0);
+    const SIZE: Vec3 = Vec3::new(200.0, 1.0, 200.0);
     let mut cmd = commands.spawn(PbrBundle {
         mesh: meshes.add(Mesh::from(bevy::math::prelude::Cuboid {
             half_size: 0.5 * SIZE,

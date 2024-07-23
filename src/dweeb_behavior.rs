@@ -1,5 +1,6 @@
 use bevy::{prelude::*, utils::HashMap};
 use bevy_tnua::{prelude::*, TnuaProximitySensor};
+use bevy_turborand::prelude::*;
 use bevy_yoetz::prelude::*;
 
 use crate::{bed::Bed, dweeb::Dweeb, dweeb_effects::DweebEffect};
@@ -42,6 +43,10 @@ enum DweebBehavior {
     Sleep {
         #[yoetz(key)]
         bed_entity: Entity,
+        #[yoetz(state)]
+        stage_is_rem: bool,
+        #[yoetz(state)]
+        stage_progress: f32,
     },
 }
 
@@ -123,7 +128,7 @@ fn suggest_walk_to_bed(
         }
         beds_statuses.insert(bed_entity, bed_status);
     }
-    for DweebBehaviorSleep { bed_entity } in sleep_on_bed_query.iter() {
+    for DweebBehaviorSleep { bed_entity, .. } in sleep_on_bed_query.iter() {
         beds_statuses.remove(bed_entity);
     }
 
@@ -229,16 +234,29 @@ fn suggest_sleep(
             1000.0,
             DweebBehavior::Sleep {
                 bed_entity: sensor_output.entity,
+                stage_is_rem: false,
+                stage_progress: 0.0,
             },
         );
     }
 }
 
 fn enact_sleep(
-    mut query: Query<(&mut TnuaController, &GlobalTransform, &DweebBehaviorSleep)>,
+    mut query: Query<(
+        &mut TnuaController,
+        &GlobalTransform,
+        &mut DweebBehaviorSleep,
+    )>,
     beds_query: Query<&GlobalTransform>,
+    time: Res<Time>,
+    mut global_rng: ResMut<GlobalRng>,
 ) {
-    for (mut controller, dweeb_transform, DweebBehaviorSleep { bed_entity }) in query.iter_mut() {
+    for (mut controller, dweeb_transform, mut sleep) in query.iter_mut() {
+        let DweebBehaviorSleep {
+            bed_entity,
+            stage_is_rem,
+            stage_progress,
+        } = sleep.as_mut();
         let Ok(bed_transform) = beds_query.get(*bed_entity) else {
             continue;
         };
@@ -249,13 +267,25 @@ fn enact_sleep(
             float_height: 1.0,
             ..Default::default()
         });
+        *stage_progress += time.delta_seconds()
+            * if *stage_is_rem {
+                0.6 + 0.2 * global_rng.f32_normalized()
+            } else {
+                0.3 + 0.1 * global_rng.f32_normalized()
+            };
+        if 1.0 <= *stage_progress {
+            *stage_progress %= 1.0;
+            *stage_is_rem = !*stage_is_rem;
+        }
     }
 }
 
 fn modify_effect(mut query: Query<(&mut DweebEffect, Option<&DweebBehaviorSleep>), With<Dweeb>>) {
     for (mut effect, sleep) in query.iter_mut() {
-        *effect = if sleep.is_some() {
-            DweebEffect::Zs
+        *effect = if let Some(sleep) = sleep {
+            DweebEffect::Zs {
+                is_rem: sleep.stage_is_rem,
+            }
         } else {
             DweebEffect::None
         };
