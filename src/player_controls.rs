@@ -109,7 +109,7 @@ fn apply_controls(
                         return None;
                     }
                     Some((
-                        vec_to_target.length_squared() / angle,
+                        vec_to_target.length_squared() * angle,
                         vec_to_target + *offset,
                     ))
                 })

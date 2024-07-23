@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::{prelude::*, utils::HashMap};
 use bevy_tnua::{prelude::*, TnuaProximitySensor};
 use bevy_turborand::prelude::*;
@@ -13,15 +15,22 @@ impl Plugin for DweebBehaviorPlugin {
         app.observe(add_behavior_to_dweeb);
         app.add_systems(
             FixedUpdate,
-            (suggest_idle, suggest_walk_to_bed, suggest_sleep).in_set(YoetzSystemSet::Suggest),
+            (
+                suggest_aweken,
+                suggest_idle,
+                suggest_sleep,
+                suggest_walk_to_bed,
+            )
+                .in_set(YoetzSystemSet::Suggest),
         );
         app.add_systems(
             FixedUpdate,
             (
+                enact_awaken,
                 enact_idle,
-                enact_walk_to_bed,
                 enact_jump_on_bed,
                 enact_sleep,
+                enact_walk_to_bed,
             )
                 .in_set(YoetzSystemSet::Act),
         );
@@ -47,6 +56,12 @@ enum DweebBehavior {
         stage_is_rem: bool,
         #[yoetz(state)]
         stage_progress: f32,
+    },
+    Awaken {
+        #[yoetz(state)]
+        from_rem: bool,
+        #[yoetz(state)]
+        timer: Timer,
     },
 }
 
@@ -269,9 +284,9 @@ fn enact_sleep(
         });
         *stage_progress += time.delta_seconds()
             * if *stage_is_rem {
-                0.6 + 0.2 * global_rng.f32_normalized()
-            } else {
                 0.3 + 0.1 * global_rng.f32_normalized()
+            } else {
+                0.15 + 0.05 * global_rng.f32_normalized()
             };
         if 1.0 <= *stage_progress {
             *stage_progress %= 1.0;
@@ -280,14 +295,76 @@ fn enact_sleep(
     }
 }
 
-fn modify_effect(mut query: Query<(&mut DweebEffect, Option<&DweebBehaviorSleep>), With<Dweeb>>) {
-    for (mut effect, sleep) in query.iter_mut() {
+#[allow(clippy::type_complexity)]
+fn modify_effect(
+    mut query: Query<
+        (
+            &mut DweebEffect,
+            AnyOf<(&DweebBehaviorSleep, &DweebBehaviorAwaken)>,
+        ),
+        With<Dweeb>,
+    >,
+) {
+    for (mut effect, (sleep, awaken)) in query.iter_mut() {
         *effect = if let Some(sleep) = sleep {
             DweebEffect::Zs {
                 is_rem: sleep.stage_is_rem,
             }
+        } else if let Some(awaken) = awaken {
+            if awaken.from_rem {
+                DweebEffect::Lightbulb
+            } else {
+                DweebEffect::Confusion
+            }
         } else {
             DweebEffect::None
         };
+    }
+}
+
+#[allow(clippy::type_complexity)]
+fn suggest_aweken(
+    mut query: Query<(
+        &mut YoetzAdvisor<DweebBehavior>,
+        AnyOf<(&DweebBehaviorSleep, &DweebBehaviorAwaken)>,
+    )>,
+    mut global_rng: ResMut<GlobalRng>,
+) {
+    for (mut advisor, (sleep, awaken)) in query.iter_mut() {
+        if let Some(sleep) = sleep {
+            let wait_secs = if sleep.stage_is_rem {
+                2.0 + 1.0 * global_rng.f32()
+            } else {
+                4.0 + 2.0 * global_rng.f32()
+            };
+            advisor.suggest(
+                // Make it less than Sleep's score, so that if we can sleep it'd override it
+                900.0,
+                DweebBehavior::Awaken {
+                    from_rem: sleep.stage_is_rem,
+                    timer: Timer::new(Duration::from_secs_f32(wait_secs), TimerMode::Once),
+                },
+            )
+        } else if awaken.is_some() {
+            advisor.suggest(
+                // Make it more than Sleep's score because we are already awake
+                1100.0,
+                DweebBehavior::Awaken {
+                    // These fields don't matter because they are both state fields
+                    from_rem: Default::default(),
+                    timer: Default::default(),
+                },
+            )
+        }
+    }
+}
+
+fn enact_awaken(
+    mut query: Query<(&mut TnuaController, &mut DweebBehaviorAwaken)>,
+    time: Res<Time>,
+) {
+    for (mut controller, mut awaken) in query.iter_mut() {
+        awaken.timer.tick(time.delta());
+        controller.basis(gen_walk(Vec3::ZERO));
     }
 }

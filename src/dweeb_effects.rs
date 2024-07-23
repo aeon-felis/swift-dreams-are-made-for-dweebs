@@ -31,6 +31,8 @@ fn add_effect_to_dweeb(trigger: Trigger<OnInsert, Dweeb>, mut commands: Commands
 pub enum DweebEffect {
     None,
     Zs { is_rem: bool },
+    Confusion,
+    Lightbulb,
 }
 
 #[derive(Component)]
@@ -75,6 +77,32 @@ fn handle_effect_discriminant_changes(
                             timer.set_elapsed(timer.duration().mul_f32(global_rng.f32()));
                             timer
                         },
+                    },
+                ));
+            }
+            DweebEffect::Confusion => {
+                commands.spawn((
+                    SceneBundle {
+                        scene: asset_server.load("Confusion.glb#Scene0"),
+                        transform: Transform::from_xyz(0.0, -4.0, 0.0),
+                        ..Default::default()
+                    },
+                    EffectParticle {
+                        owner: entity,
+                        timer: Default::default(),
+                    },
+                ));
+            }
+            DweebEffect::Lightbulb => {
+                commands.spawn((
+                    SceneBundle {
+                        scene: asset_server.load("Lightbulb.glb#Scene0"),
+                        transform: Transform::from_xyz(0.0, -4.0, 0.0),
+                        ..Default::default()
+                    },
+                    EffectParticle {
+                        owner: entity,
+                        timer: Default::default(),
                     },
                 ));
             }
@@ -123,6 +151,9 @@ fn handle_effect_particles(
                     };
                 particle_transform.translation =
                     owner_transform.translation() + (1.0 + 0.2 * animation_progress) * Vec3::Y;
+            }
+            DweebEffect::Confusion | DweebEffect::Lightbulb => {
+                particle_transform.translation = owner_transform.translation() + 1.0 * Vec3::Y;
             }
         }
     }
