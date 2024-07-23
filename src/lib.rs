@@ -5,6 +5,7 @@ use bevy_yoleck::prelude::*;
 use camera::SwiftDreamsAreMadeForDweebsCameraPlugin;
 use dweeb::DweebPlugin;
 use dweeb_behavior::DweebBehaviorPlugin;
+use dweeb_effects::DweebEffectsPlugin;
 use player::PlayerPlugin;
 use player_controls::PlayerControlsPlugin;
 
@@ -13,6 +14,7 @@ mod bed;
 mod camera;
 mod dweeb;
 mod dweeb_behavior;
+mod dweeb_effects;
 mod player;
 mod player_controls;
 mod util;
@@ -69,6 +71,7 @@ impl Plugin for SwiftDreamsAreMadeForDweebsPlugin {
             BedPlugin,
             DweebPlugin,
             DweebBehaviorPlugin,
+            DweebEffectsPlugin,
             PlayerPlugin,
             PlayerControlsPlugin,
         ));

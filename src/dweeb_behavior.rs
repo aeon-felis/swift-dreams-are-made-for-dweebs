@@ -2,7 +2,7 @@ use bevy::{prelude::*, utils::HashMap};
 use bevy_tnua::{prelude::*, TnuaProximitySensor};
 use bevy_yoetz::prelude::*;
 
-use crate::{bed::Bed, dweeb::Dweeb};
+use crate::{bed::Bed, dweeb::Dweeb, dweeb_effects::DweebEffect};
 
 pub struct DweebBehaviorPlugin;
 
@@ -16,8 +16,15 @@ impl Plugin for DweebBehaviorPlugin {
         );
         app.add_systems(
             FixedUpdate,
-            (enact_idle, enact_walk_to_bed, enact_jump_on_bed, enact_sleep).in_set(YoetzSystemSet::Act),
+            (
+                enact_idle,
+                enact_walk_to_bed,
+                enact_jump_on_bed,
+                enact_sleep,
+            )
+                .in_set(YoetzSystemSet::Act),
         );
+        app.add_systems(FixedUpdate, modify_effect);
     }
 }
 
@@ -228,11 +235,7 @@ fn suggest_sleep(
 }
 
 fn enact_sleep(
-    mut query: Query<(
-        &mut TnuaController,
-        &GlobalTransform,
-        &DweebBehaviorSleep,
-    )>,
+    mut query: Query<(&mut TnuaController, &GlobalTransform, &DweebBehaviorSleep)>,
     beds_query: Query<&GlobalTransform>,
 ) {
     for (mut controller, dweeb_transform, DweebBehaviorSleep { bed_entity }) in query.iter_mut() {
@@ -246,5 +249,15 @@ fn enact_sleep(
             float_height: 1.0,
             ..Default::default()
         });
+    }
+}
+
+fn modify_effect(mut query: Query<(&mut DweebEffect, Option<&DweebBehaviorSleep>), With<Dweeb>>) {
+    for (mut effect, sleep) in query.iter_mut() {
+        *effect = if sleep.is_some() {
+            DweebEffect::Zs
+        } else {
+            DweebEffect::None
+        };
     }
 }
