@@ -1,5 +1,5 @@
-use bevy::prelude::*;
-use bevy_tnua::prelude::*;
+use bevy::{prelude::*, utils::HashMap};
+use bevy_tnua::{prelude::*, TnuaProximitySensor};
 use bevy_yoetz::prelude::*;
 
 use crate::{bed::Bed, dweeb::Dweeb};
@@ -12,11 +12,11 @@ impl Plugin for DweebBehaviorPlugin {
         app.observe(add_behavior_to_dweeb);
         app.add_systems(
             FixedUpdate,
-            (suggest_idle, suggest_walk_to_bed).in_set(YoetzSystemSet::Suggest),
+            (suggest_idle, suggest_walk_to_bed, suggest_sleep).in_set(YoetzSystemSet::Suggest),
         );
         app.add_systems(
             FixedUpdate,
-            (enact_idle, enact_walk_to_bed, enact_jump_on_bed).in_set(YoetzSystemSet::Act),
+            (enact_idle, enact_walk_to_bed, enact_jump_on_bed, enact_sleep).in_set(YoetzSystemSet::Act),
         );
     }
 }
@@ -29,6 +29,10 @@ enum DweebBehavior {
         bed_entity: Entity,
     },
     JumpOnBed {
+        #[yoetz(key)]
+        bed_entity: Entity,
+    },
+    Sleep {
         #[yoetz(key)]
         bed_entity: Entity,
     },
@@ -66,10 +70,16 @@ fn suggest_idle(mut query: Query<&mut YoetzAdvisor<DweebBehavior>>) {
     }
 }
 
+fn enact_idle(mut query: Query<&mut TnuaController, With<DweebBehaviorIdle>>) {
+    for mut controller in query.iter_mut() {
+        controller.basis(gen_walk(Vec3::ZERO));
+    }
+}
+
 #[allow(clippy::type_complexity)]
 fn suggest_walk_to_bed(
     mut query: Query<
-        (&mut YoetzAdvisor<DweebBehavior>, &GlobalTransform),
+        (Entity, &mut YoetzAdvisor<DweebBehavior>, &GlobalTransform),
         Or<(
             With<DweebBehaviorIdle>,
             With<DweebBehaviorWalkToBed>,
@@ -77,14 +87,51 @@ fn suggest_walk_to_bed(
         )>,
     >,
     beds_query: Query<(Entity, &Bed, &GlobalTransform)>,
+    sleep_on_bed_query: Query<&DweebBehaviorSleep>,
 ) {
-    for (mut advisor, dweeb_transform) in query.iter_mut() {
-        for (bed_entity, bed, bed_transform) in beds_query.iter() {
-            if bed.occupied_by.is_some() {
+    #[derive(Debug)]
+    struct BedStatus {
+        position: Vec3,
+        closest: Option<(Entity, f32)>,
+        demand: f32,
+    }
+    let mut beds_statuses = HashMap::new();
+    for (bed_entity, _, bed_transform) in beds_query.iter() {
+        let mut bed_status = BedStatus {
+            position: bed_transform.translation(),
+            closest: None,
+            demand: 0.0,
+        };
+        for (dweeb_entity, _, dweeb_transform) in query.iter() {
+            let distance_sq = dweeb_transform
+                .translation()
+                .distance_squared(bed_status.position);
+            bed_status.demand += 10.0f32.powi(2) / distance_sq;
+            if match bed_status.closest {
+                Some((_, currrent_distance_sq)) => distance_sq < currrent_distance_sq,
+                None => true,
+            } {
+                bed_status.closest = Some((dweeb_entity, distance_sq));
+            }
+        }
+        beds_statuses.insert(bed_entity, bed_status);
+    }
+    for DweebBehaviorSleep { bed_entity } in sleep_on_bed_query.iter() {
+        beds_statuses.remove(bed_entity);
+    }
+
+    for (dweeb_entity, mut advisor, dweeb_transform) in query.iter_mut() {
+        for (&bed_entity, bed_status) in beds_statuses.iter() {
+            if bed_status
+                .closest
+                .is_some_and(|(closest_entity, distance_sq)| {
+                    closest_entity != dweeb_entity && distance_sq < 3.0f32.powi(2)
+                })
+            {
                 continue;
             }
-            let distance_to_bed_sq = bed_transform
-                .translation()
+            let distance_to_bed_sq = bed_status
+                .position
                 .distance_squared(dweeb_transform.translation());
             if 2.0f32.powi(2) < distance_to_bed_sq {
                 advisor.suggest(
@@ -95,12 +142,6 @@ fn suggest_walk_to_bed(
                 advisor.suggest(100.0, DweebBehavior::JumpOnBed { bed_entity });
             }
         }
-    }
-}
-
-fn enact_idle(mut query: Query<&mut TnuaController, With<DweebBehaviorIdle>>) {
-    for mut controller in query.iter_mut() {
-        controller.basis(gen_walk(Vec3::ZERO));
     }
 }
 
@@ -154,6 +195,55 @@ fn enact_jump_on_bed(
             //peak_prevention_extra_gravity: todo!(),
             //reschedule_cooldown: todo!(),
             //input_buffer_time: todo!(),
+            ..Default::default()
+        });
+    }
+}
+
+fn suggest_sleep(
+    mut query: Query<(
+        &mut YoetzAdvisor<DweebBehavior>,
+        &TnuaController,
+        &TnuaProximitySensor,
+    )>,
+    beds_query: Query<(), With<Bed>>,
+) {
+    for (mut advisor, controller, sensor) in query.iter_mut() {
+        if controller.is_airborne().unwrap_or(true) {
+            continue;
+        }
+        let Some(sensor_output) = sensor.output.as_ref() else {
+            continue;
+        };
+        if !beds_query.contains(sensor_output.entity) {
+            continue;
+        }
+        advisor.suggest(
+            1000.0,
+            DweebBehavior::Sleep {
+                bed_entity: sensor_output.entity,
+            },
+        );
+    }
+}
+
+fn enact_sleep(
+    mut query: Query<(
+        &mut TnuaController,
+        &GlobalTransform,
+        &DweebBehaviorSleep,
+    )>,
+    beds_query: Query<&GlobalTransform>,
+) {
+    for (mut controller, dweeb_transform, DweebBehaviorSleep { bed_entity }) in query.iter_mut() {
+        let Ok(bed_transform) = beds_query.get(*bed_entity) else {
+            continue;
+        };
+        let vector = bed_transform.translation() - dweeb_transform.translation();
+        controller.basis(TnuaBuiltinWalk {
+            desired_velocity: vector.with_y(0.0).clamp_length_max(2.0),
+            desired_forward: bed_transform.forward().with_y(0.0).normalize_or_zero(),
+            float_height: 1.0,
             ..Default::default()
         });
     }
