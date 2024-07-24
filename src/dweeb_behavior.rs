@@ -300,12 +300,15 @@ fn modify_effect(
     mut query: Query<
         (
             &mut DweebEffect,
-            AnyOf<(&DweebBehaviorSleep, &DweebBehaviorAwaken)>,
+            // NOTE: don't use AnyOf here because we need it to happen not matter what the current
+            // strategy is (if it's not one of the following, we'll just remove the effect)
+            Option<&DweebBehaviorSleep>,
+            Option<&DweebBehaviorAwaken>,
         ),
         With<Dweeb>,
     >,
 ) {
-    for (mut effect, (sleep, awaken)) in query.iter_mut() {
+    for (mut effect, sleep, awaken) in query.iter_mut() {
         *effect = if let Some(sleep) = sleep {
             DweebEffect::Zs {
                 is_rem: sleep.stage_is_rem,
@@ -345,16 +348,18 @@ fn suggest_aweken(
                     timer: Timer::new(Duration::from_secs_f32(wait_secs), TimerMode::Once),
                 },
             )
-        } else if awaken.is_some() {
-            advisor.suggest(
-                // Make it more than Sleep's score because we are already awake
-                1100.0,
-                DweebBehavior::Awaken {
-                    // These fields don't matter because they are both state fields
-                    from_rem: Default::default(),
-                    timer: Default::default(),
-                },
-            )
+        } else if let Some(awaken) = awaken {
+            if !awaken.timer.finished() {
+                advisor.suggest(
+                    // Make it more than Sleep's score because we are already awake
+                    1100.0,
+                    DweebBehavior::Awaken {
+                        // These fields don't matter because they are both state fields
+                        from_rem: Default::default(),
+                        timer: Default::default(),
+                    },
+                )
+            }
         }
     }
 }
