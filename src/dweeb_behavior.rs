@@ -1,11 +1,15 @@
 use std::time::Duration;
 
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{
+    ecs::query::{QueryData, WorldQuery},
+    prelude::*,
+    utils::HashMap,
+};
 use bevy_tnua::{prelude::*, TnuaProximitySensor};
 use bevy_turborand::prelude::*;
 use bevy_yoetz::prelude::*;
 
-use crate::{bed::Bed, dweeb::Dweeb, dweeb_effects::DweebEffect};
+use crate::{bed::Bed, desk::Desk, dweeb::Dweeb, dweeb_effects::DweebEffect};
 
 pub struct DweebBehaviorPlugin;
 
@@ -19,7 +23,8 @@ impl Plugin for DweebBehaviorPlugin {
                 suggest_aweken,
                 suggest_idle,
                 suggest_sleep,
-                suggest_walk_to_bed,
+                suggest_walk_to::<Bed>,
+                suggest_walk_to::<Desk>,
             )
                 .in_set(YoetzSystemSet::Suggest),
         );
@@ -30,7 +35,8 @@ impl Plugin for DweebBehaviorPlugin {
                 enact_idle,
                 enact_jump_on_bed,
                 enact_sleep,
-                enact_walk_to_bed,
+                enact_walk_to::<Bed>,
+                enact_walk_to::<Desk>,
             )
                 .in_set(YoetzSystemSet::Act),
         );
@@ -62,6 +68,14 @@ enum DweebBehavior {
         from_rem: bool,
         #[yoetz(state)]
         timer: Timer,
+    },
+    WalkToDesk {
+        #[yoetz(key)]
+        desk_entity: Entity,
+    },
+    Scribe {
+        #[yoetz(key)]
+        desk_entity: Entity,
     },
 }
 
@@ -103,53 +117,161 @@ fn enact_idle(mut query: Query<&mut TnuaController, With<DweebBehaviorIdle>>) {
     }
 }
 
+trait WalkTo: Component {
+    type SuggestableFrom: QueryData;
+
+    fn check_suggestable_from(
+        _suggestable_from: <Self::SuggestableFrom as WorldQuery>::Item<'_>,
+    ) -> bool {
+        true
+    }
+
+    fn walk_to_position(transform: &GlobalTransform) -> Vec3 {
+        transform.translation()
+    }
+
+    const TARGET_DISTANCE: f32;
+
+    type DweebUsesDestinationIndicator: Component;
+
+    fn extract_entity_in_use(indicator: &Self::DweebUsesDestinationIndicator) -> Entity;
+    fn suggest_walk_to(destination: Entity) -> DweebBehavior;
+    fn suggest_use(destination: Entity) -> DweebBehavior;
+
+    type Behavior: Component;
+
+    fn extract_entity_from_behavior(behavior: &Self::Behavior) -> Entity;
+}
+
+impl WalkTo for Bed {
+    type SuggestableFrom = AnyOf<(
+        &'static DweebBehaviorIdle,
+        &'static DweebBehaviorWalkToBed,
+        &'static DweebBehaviorJumpOnBed,
+    )>;
+
+    const TARGET_DISTANCE: f32 = 2.0;
+
+    type DweebUsesDestinationIndicator = DweebBehaviorSleep;
+
+    fn extract_entity_in_use(indicator: &Self::DweebUsesDestinationIndicator) -> Entity {
+        indicator.bed_entity
+    }
+
+    fn suggest_walk_to(destination: Entity) -> DweebBehavior {
+        DweebBehavior::WalkToBed {
+            bed_entity: destination,
+        }
+    }
+
+    fn suggest_use(destination: Entity) -> DweebBehavior {
+        DweebBehavior::JumpOnBed {
+            bed_entity: destination,
+        }
+    }
+
+    type Behavior = DweebBehaviorWalkToBed;
+
+    fn extract_entity_from_behavior(behavior: &Self::Behavior) -> Entity {
+        behavior.bed_entity
+    }
+}
+
+impl WalkTo for Desk {
+    type SuggestableFrom = AnyOf<(
+        &'static DweebBehaviorStartled,
+        &'static DweebBehaviorWalkToDesk,
+    )>;
+
+    fn check_suggestable_from(
+        (startled, _): <Self::SuggestableFrom as WorldQuery>::Item<'_>,
+    ) -> bool {
+        if let Some(startled) = startled {
+            startled.from_rem
+        } else {
+            true
+        }
+    }
+
+    const TARGET_DISTANCE: f32 = 0.5;
+
+    fn walk_to_position(transform: &GlobalTransform) -> Vec3 {
+        transform.transform_point(1.0 * Vec3::Z)
+    }
+
+    type DweebUsesDestinationIndicator = DweebBehaviorScribe;
+
+    fn extract_entity_in_use(indicator: &Self::DweebUsesDestinationIndicator) -> Entity {
+        indicator.desk_entity
+    }
+
+    fn suggest_walk_to(destination: Entity) -> DweebBehavior {
+        DweebBehavior::WalkToDesk {
+            desk_entity: destination,
+        }
+    }
+
+    fn suggest_use(destination: Entity) -> DweebBehavior {
+        DweebBehavior::Scribe {
+            desk_entity: destination,
+        }
+    }
+
+    type Behavior = DweebBehaviorWalkToDesk;
+
+    fn extract_entity_from_behavior(behavior: &Self::Behavior) -> Entity {
+        behavior.desk_entity
+    }
+}
+
 #[allow(clippy::type_complexity)]
-fn suggest_walk_to_bed(
-    mut query: Query<
-        (Entity, &mut YoetzAdvisor<DweebBehavior>, &GlobalTransform),
-        Or<(
-            With<DweebBehaviorIdle>,
-            With<DweebBehaviorWalkToBed>,
-            With<DweebBehaviorJumpOnBed>,
-        )>,
-    >,
-    beds_query: Query<(Entity, &Bed, &GlobalTransform)>,
-    sleep_on_bed_query: Query<&DweebBehaviorSleep>,
+fn suggest_walk_to<D: WalkTo>(
+    mut query: Query<(
+        Entity,
+        &mut YoetzAdvisor<DweebBehavior>,
+        D::SuggestableFrom,
+        &GlobalTransform,
+    )>,
+    destinations_query: Query<(Entity, &D, &GlobalTransform)>,
+    uses_destination_query: Query<&D::DweebUsesDestinationIndicator>,
 ) {
     #[derive(Debug)]
-    struct BedStatus {
+    struct DestinationStatus {
         position: Vec3,
         closest: Option<(Entity, f32)>,
         demand: f32,
     }
-    let mut beds_statuses = HashMap::new();
-    for (bed_entity, _, bed_transform) in beds_query.iter() {
-        let mut bed_status = BedStatus {
-            position: bed_transform.translation(),
+    let mut destinations_statuses = HashMap::new();
+    for (destination_entity, _, destination_transform) in destinations_query.iter() {
+        let mut destination_status = DestinationStatus {
+            position: D::walk_to_position(destination_transform),
             closest: None,
             demand: 0.0,
         };
-        for (dweeb_entity, _, dweeb_transform) in query.iter() {
+        for (dweeb_entity, _, _, dweeb_transform) in query.iter() {
             let distance_sq = dweeb_transform
                 .translation()
-                .distance_squared(bed_status.position);
-            bed_status.demand += 10.0f32.powi(2) / distance_sq;
-            if match bed_status.closest {
+                .distance_squared(destination_status.position);
+            destination_status.demand += 10.0f32.powi(2) / distance_sq;
+            if match destination_status.closest {
                 Some((_, currrent_distance_sq)) => distance_sq < currrent_distance_sq,
                 None => true,
             } {
-                bed_status.closest = Some((dweeb_entity, distance_sq));
+                destination_status.closest = Some((dweeb_entity, distance_sq));
             }
         }
-        beds_statuses.insert(bed_entity, bed_status);
+        destinations_statuses.insert(destination_entity, destination_status);
     }
-    for DweebBehaviorSleep { bed_entity, .. } in sleep_on_bed_query.iter() {
-        beds_statuses.remove(bed_entity);
+    for in_use_indicator in uses_destination_query.iter() {
+        destinations_statuses.remove(&D::extract_entity_in_use(in_use_indicator));
     }
 
-    for (dweeb_entity, mut advisor, dweeb_transform) in query.iter_mut() {
-        for (&bed_entity, bed_status) in beds_statuses.iter() {
-            if bed_status
+    for (dweeb_entity, mut advisor, suggestable_from, dweeb_transform) in query.iter_mut() {
+        if !D::check_suggestable_from(suggestable_from) {
+            continue;
+        }
+        for (&destination_entity, destination_status) in destinations_statuses.iter() {
+            if destination_status
                 .closest
                 .is_some_and(|(closest_entity, distance_sq)| {
                     closest_entity != dweeb_entity && distance_sq < 3.0f32.powi(2)
@@ -157,34 +279,33 @@ fn suggest_walk_to_bed(
             {
                 continue;
             }
-            let distance_to_bed_sq = bed_status
+            let distance_to_destination_sq = destination_status
                 .position
-                .distance_squared(dweeb_transform.translation());
-            if 2.0f32.powi(2) < distance_to_bed_sq {
+                .with_y(0.0)
+                .distance_squared(dweeb_transform.translation().with_y(0.0));
+            if D::TARGET_DISTANCE.powi(2) < distance_to_destination_sq {
                 advisor.suggest(
-                    40.0f32.powi(2) / distance_to_bed_sq,
-                    DweebBehavior::WalkToBed { bed_entity },
+                    40.0f32.powi(2) / distance_to_destination_sq,
+                    D::suggest_walk_to(destination_entity),
                 );
             } else {
-                advisor.suggest(100.0, DweebBehavior::JumpOnBed { bed_entity });
+                advisor.suggest(100.0, D::suggest_use(destination_entity));
             }
         }
     }
 }
 
-fn enact_walk_to_bed(
-    mut query: Query<(
-        &mut TnuaController,
-        &GlobalTransform,
-        &DweebBehaviorWalkToBed,
-    )>,
-    beds_query: Query<&GlobalTransform>,
+fn enact_walk_to<D: WalkTo>(
+    mut query: Query<(&mut TnuaController, &GlobalTransform, &D::Behavior)>,
+    destination_query: Query<&GlobalTransform>,
 ) {
-    for (mut controller, dweeb_transform, walk_to_bed) in query.iter_mut() {
-        let Ok(bed_transform) = beds_query.get(walk_to_bed.bed_entity) else {
+    for (mut controller, dweeb_transform, walk_to) in query.iter_mut() {
+        let Ok(destination_transform) =
+            destination_query.get(D::extract_entity_from_behavior(walk_to))
+        else {
             continue;
         };
-        let vector = bed_transform.translation() - dweeb_transform.translation();
+        let vector = D::walk_to_position(destination_transform) - dweeb_transform.translation();
         let direction = vector.with_y(0.0).normalize_or_zero();
         controller.basis(gen_walk(direction));
     }

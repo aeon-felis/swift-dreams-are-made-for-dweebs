@@ -3,6 +3,7 @@ use bed::BedPlugin;
 use bevy::prelude::*;
 use bevy_yoleck::prelude::*;
 use camera::SwiftDreamsAreMadeForDweebsCameraPlugin;
+use desk::DeskPlugin;
 use dweeb::DweebPlugin;
 use dweeb_behavior::DweebBehaviorPlugin;
 use dweeb_effects::DweebEffectsPlugin;
@@ -12,6 +13,7 @@ use player_controls::PlayerControlsPlugin;
 mod arena;
 mod bed;
 mod camera;
+mod desk;
 mod dweeb;
 mod dweeb_behavior;
 mod dweeb_effects;
@@ -69,6 +71,7 @@ impl Plugin for SwiftDreamsAreMadeForDweebsPlugin {
         app.add_plugins((
             ArenaPlugin,
             BedPlugin,
+            DeskPlugin,
             DweebBehaviorPlugin,
             DweebEffectsPlugin,
             DweebPlugin,
