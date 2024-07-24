@@ -57,7 +57,7 @@ enum DweebBehavior {
         #[yoetz(state)]
         stage_progress: f32,
     },
-    Awaken {
+    Startled {
         #[yoetz(state)]
         from_rem: bool,
         #[yoetz(state)]
@@ -303,18 +303,18 @@ fn modify_effect(
             // NOTE: don't use AnyOf here because we need it to happen not matter what the current
             // strategy is (if it's not one of the following, we'll just remove the effect)
             Option<&DweebBehaviorSleep>,
-            Option<&DweebBehaviorAwaken>,
+            Option<&DweebBehaviorStartled>,
         ),
         With<Dweeb>,
     >,
 ) {
-    for (mut effect, sleep, awaken) in query.iter_mut() {
+    for (mut effect, sleep, startled) in query.iter_mut() {
         *effect = if let Some(sleep) = sleep {
             DweebEffect::Zs {
                 is_rem: sleep.stage_is_rem,
             }
-        } else if let Some(awaken) = awaken {
-            if awaken.from_rem {
+        } else if let Some(startled) = startled {
+            if startled.from_rem {
                 DweebEffect::Lightbulb
             } else {
                 DweebEffect::Confusion
@@ -329,11 +329,11 @@ fn modify_effect(
 fn suggest_aweken(
     mut query: Query<(
         &mut YoetzAdvisor<DweebBehavior>,
-        AnyOf<(&DweebBehaviorSleep, &DweebBehaviorAwaken)>,
+        AnyOf<(&DweebBehaviorSleep, &DweebBehaviorStartled)>,
     )>,
     mut global_rng: ResMut<GlobalRng>,
 ) {
-    for (mut advisor, (sleep, awaken)) in query.iter_mut() {
+    for (mut advisor, (sleep, startled)) in query.iter_mut() {
         if let Some(sleep) = sleep {
             let wait_secs = if sleep.stage_is_rem {
                 2.0 + 1.0 * global_rng.f32()
@@ -343,17 +343,17 @@ fn suggest_aweken(
             advisor.suggest(
                 // Make it less than Sleep's score, so that if we can sleep it'd override it
                 900.0,
-                DweebBehavior::Awaken {
+                DweebBehavior::Startled {
                     from_rem: sleep.stage_is_rem,
                     timer: Timer::new(Duration::from_secs_f32(wait_secs), TimerMode::Once),
                 },
             )
-        } else if let Some(awaken) = awaken {
-            if !awaken.timer.finished() {
+        } else if let Some(startled) = startled {
+            if !startled.timer.finished() {
                 advisor.suggest(
                     // Make it more than Sleep's score because we are already awake
                     1100.0,
-                    DweebBehavior::Awaken {
+                    DweebBehavior::Startled {
                         // These fields don't matter because they are both state fields
                         from_rem: Default::default(),
                         timer: Default::default(),
@@ -365,11 +365,11 @@ fn suggest_aweken(
 }
 
 fn enact_awaken(
-    mut query: Query<(&mut TnuaController, &mut DweebBehaviorAwaken)>,
+    mut query: Query<(&mut TnuaController, &mut DweebBehaviorStartled)>,
     time: Res<Time>,
 ) {
-    for (mut controller, mut awaken) in query.iter_mut() {
-        awaken.timer.tick(time.delta());
+    for (mut controller, mut startled) in query.iter_mut() {
+        startled.timer.tick(time.delta());
         controller.basis(gen_walk(Vec3::ZERO));
     }
 }
