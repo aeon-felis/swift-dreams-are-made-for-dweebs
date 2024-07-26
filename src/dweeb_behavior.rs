@@ -25,6 +25,7 @@ impl Plugin for DweebBehaviorPlugin {
                 suggest_sleep,
                 suggest_walk_to::<Bed>,
                 suggest_walk_to::<Desk>,
+                suggest_scribe,
             )
                 .in_set(YoetzSystemSet::Suggest),
         );
@@ -37,6 +38,7 @@ impl Plugin for DweebBehaviorPlugin {
                 enact_sleep,
                 enact_walk_to::<Bed>,
                 enact_walk_to::<Desk>,
+                enact_scribe,
             )
                 .in_set(YoetzSystemSet::Act),
         );
@@ -76,6 +78,8 @@ enum DweebBehavior {
     Scribe {
         #[yoetz(key)]
         desk_entity: Entity,
+        #[yoetz(state)]
+        timer: Timer,
     },
 }
 
@@ -214,6 +218,7 @@ impl WalkTo for Desk {
     fn suggest_use(destination: Entity) -> DweebBehavior {
         DweebBehavior::Scribe {
             desk_entity: destination,
+            timer: Timer::new(Duration::from_secs_f32(3.0), TimerMode::Once),
         }
     }
 
@@ -281,8 +286,8 @@ fn suggest_walk_to<D: WalkTo>(
             }
             let distance_to_destination_sq = destination_status
                 .position
-                .with_y(0.0)
-                .distance_squared(dweeb_transform.translation().with_y(0.0));
+                .xz()
+                .distance_squared(dweeb_transform.translation().xz());
             if D::TARGET_DISTANCE.powi(2) < distance_to_destination_sq {
                 advisor.suggest(
                     40.0f32.powi(2) / distance_to_destination_sq,
@@ -425,11 +430,13 @@ fn modify_effect(
             // strategy is (if it's not one of the following, we'll just remove the effect)
             Option<&DweebBehaviorSleep>,
             Option<&DweebBehaviorStartled>,
+            Has<DweebBehaviorWalkToDesk>,
+            Has<DweebBehaviorScribe>,
         ),
         With<Dweeb>,
     >,
 ) {
-    for (mut effect, sleep, startled) in query.iter_mut() {
+    for (mut effect, sleep, startled, walk_to_desk, scribe) in query.iter_mut() {
         *effect = if let Some(sleep) = sleep {
             DweebEffect::Zs {
                 is_rem: sleep.stage_is_rem,
@@ -440,6 +447,8 @@ fn modify_effect(
             } else {
                 DweebEffect::Confusion
             }
+        } else if walk_to_desk || scribe {
+            DweebEffect::Lightbulb
         } else {
             DweebEffect::None
         };
@@ -492,5 +501,65 @@ fn enact_awaken(
     for (mut controller, mut startled) in query.iter_mut() {
         startled.timer.tick(time.delta());
         controller.basis(gen_walk(Vec3::ZERO));
+    }
+}
+
+fn suggest_scribe(
+    mut query: Query<(
+        &mut YoetzAdvisor<DweebBehavior>,
+        &DweebBehaviorScribe,
+        &GlobalTransform,
+    )>,
+    desks_query: Query<&GlobalTransform>,
+) {
+    for (mut advisor, scribe, dweeb_transform) in query.iter_mut() {
+        if scribe.timer.finished() {
+            continue;
+        }
+        let Ok(desk_transform) = desks_query.get(scribe.desk_entity) else {
+            continue;
+        };
+        let target_position = Desk::walk_to_position(desk_transform);
+        let distance_sq = dweeb_transform
+            .translation()
+            .xz()
+            .distance_squared(target_position.xz());
+        if distance_sq <= Desk::TARGET_DISTANCE.powi(2) {
+            advisor.suggest(
+                1000.0,
+                DweebBehavior::Scribe {
+                    desk_entity: scribe.desk_entity,
+                    timer: Default::default(),
+                },
+            );
+        }
+    }
+}
+
+fn enact_scribe(
+    mut query: Query<(
+        &mut TnuaController,
+        &GlobalTransform,
+        &mut DweebBehaviorScribe,
+    )>,
+    desks_query: Query<&GlobalTransform>,
+    time: Res<Time>,
+) {
+    for (mut controller, dweeb_transform, mut scribe) in query.iter_mut() {
+        let DweebBehaviorScribe { desk_entity, timer } = scribe.as_mut();
+        if timer.tick(time.delta()).finished() {
+            info!("FINISHED scribing"); // TODO: increase the score instead
+            continue;
+        }
+        let Ok(desk_transform) = desks_query.get(*desk_entity) else {
+            continue;
+        };
+        let vector = Desk::walk_to_position(desk_transform) - dweeb_transform.translation();
+        controller.basis(TnuaBuiltinWalk {
+            desired_velocity: vector.with_y(0.0).clamp_length_max(2.0),
+            desired_forward: desk_transform.forward().with_y(0.0).normalize_or_zero(),
+            float_height: 1.5,
+            ..Default::default()
+        });
     }
 }
