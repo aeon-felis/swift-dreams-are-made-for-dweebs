@@ -9,6 +9,7 @@ use dweeb_behavior::DweebBehaviorPlugin;
 use dweeb_effects::DweebEffectsPlugin;
 use player::PlayerPlugin;
 use player_controls::PlayerControlsPlugin;
+use score::ScorePlugin;
 
 mod arena;
 mod bed;
@@ -19,6 +20,7 @@ mod dweeb_behavior;
 mod dweeb_effects;
 mod player;
 mod player_controls;
+mod score;
 mod util;
 
 pub struct SwiftDreamsAreMadeForDweebsPlugin {
@@ -77,6 +79,7 @@ impl Plugin for SwiftDreamsAreMadeForDweebsPlugin {
             DweebPlugin,
             PlayerControlsPlugin,
             PlayerPlugin,
+            ScorePlugin,
         ));
 
         app.add_systems(Update, enable_disable_physics);

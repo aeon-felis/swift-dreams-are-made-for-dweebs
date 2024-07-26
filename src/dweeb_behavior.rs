@@ -9,7 +9,7 @@ use bevy_tnua::{prelude::*, TnuaProximitySensor};
 use bevy_turborand::prelude::*;
 use bevy_yoetz::prelude::*;
 
-use crate::{bed::Bed, desk::Desk, dweeb::Dweeb, dweeb_effects::DweebEffect};
+use crate::{bed::Bed, desk::Desk, dweeb::Dweeb, dweeb_effects::DweebEffect, score::IncreaseScore};
 
 pub struct DweebBehaviorPlugin;
 
@@ -544,11 +544,12 @@ fn enact_scribe(
     )>,
     desks_query: Query<&GlobalTransform>,
     time: Res<Time>,
+    mut score_writer: EventWriter<IncreaseScore>,
 ) {
     for (mut controller, dweeb_transform, mut scribe) in query.iter_mut() {
         let DweebBehaviorScribe { desk_entity, timer } = scribe.as_mut();
         if timer.tick(time.delta()).finished() {
-            info!("FINISHED scribing"); // TODO: increase the score instead
+            score_writer.send(IncreaseScore);
             continue;
         }
         let Ok(desk_transform) = desks_query.get(*desk_entity) else {
