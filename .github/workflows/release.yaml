@@ -299,6 +299,7 @@ jobs:
             ./butler push \
                 --fix-permissions \
                 --userversion="${{ steps.get_version.outputs.tag }}" \
+                --ignore="*.blend" \
                 builds/$channel/* \
                 ${{ env.itch_target }}:$channel
           done
