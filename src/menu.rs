@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts};
 use bevy_egui_kbgp::prelude::*;
 
-use crate::{score::GameTime, ActionForKbgp, AppState, During};
+use crate::{score::GameData, ActionForKbgp, AppState, During};
 
 pub struct MenuPlugin;
 
@@ -171,13 +171,13 @@ fn pause_menu(mut frame_ui: ResMut<FrameUi>, mut next_state: ResMut<NextState<Ap
 
 fn game_over_menu(
     mut frame_ui: ResMut<FrameUi>,
-    game_time: Res<GameTime>,
+    game_data: Res<GameData>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     let Some(ui) = frame_ui.0.as_mut() else {
         return;
     };
-    if game_time.is_finished() {
+    if game_data.is_finished() {
         ui.label(
             egui::RichText::new("Time Out")
                 .size(60.0)
