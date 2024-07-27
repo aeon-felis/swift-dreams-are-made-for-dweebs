@@ -7,6 +7,8 @@ use desk::DeskPlugin;
 use dweeb::DweebPlugin;
 use dweeb_behavior::DweebBehaviorPlugin;
 use dweeb_effects::DweebEffectsPlugin;
+use loading::LoadingPlugin;
+use menu::MenuPlugin;
 use player::PlayerPlugin;
 use player_controls::PlayerControlsPlugin;
 use score::ScorePlugin;
@@ -18,6 +20,8 @@ mod desk;
 mod dweeb;
 mod dweeb_behavior;
 mod dweeb_effects;
+mod loading;
+mod menu;
 mod player;
 mod player_controls;
 mod score;
@@ -45,8 +49,8 @@ impl Plugin for SwiftDreamsAreMadeForDweebsPlugin {
                 when_game: AppState::Game,
             });
         } else {
-            // app.add_plugins(MenuPlugin);
-            // app.add_plugins(LevelHandlingPlugin);
+            app.add_plugins(MenuPlugin);
+            app.add_plugins(LoadingPlugin);
             // if let Some(start_at_level) = &self.start_at_level {
             // let start_at_level = if start_at_level.ends_with(".yol") {
             // start_at_level.clone()
@@ -62,13 +66,13 @@ impl Plugin for SwiftDreamsAreMadeForDweebsPlugin {
             // },
             // );
             // }
-            app.add_systems(
-                Startup,
-                |asset_server: Res<AssetServer>, mut commands: Commands| {
-                    commands.spawn(YoleckLoadLevel(asset_server.load("levels/Level.yol")));
-                },
-            );
-            app.insert_state(AppState::Game);
+            // app.add_systems(
+            // Startup,
+            // |asset_server: Res<AssetServer>, mut commands: Commands| {
+            // commands.spawn(YoleckLoadLevel(asset_server.load("levels/Level.yol")));
+            // },
+            // );
+            app.insert_state(AppState::MainMenu);
         }
         app.add_plugins((
             ArenaPlugin,
@@ -97,7 +101,6 @@ pub enum AppState {
     #[default]
     MainMenu,
     PauseMenu,
-    LevelSelectMenu,
     LoadLevel,
     Editor,
     Game,
@@ -110,7 +113,6 @@ impl AppState {
         match self {
             AppState::MainMenu => true,
             AppState::PauseMenu => true,
-            AppState::LevelSelectMenu => true,
             AppState::LoadLevel => false,
             AppState::Editor => false,
             AppState::Game => false,
