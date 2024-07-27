@@ -3,7 +3,7 @@ use bevy_tnua::{builtins::TnuaBuiltinDash, prelude::*};
 use leafwing_input_manager::prelude::*;
 use ordered_float::OrderedFloat;
 
-use crate::player::IsPlayer;
+use crate::{player::IsPlayer, AppState, During};
 
 pub struct PlayerControlsPlugin;
 
@@ -11,7 +11,8 @@ impl Plugin for PlayerControlsPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(InputManagerPlugin::<PlayerAction>::default());
         app.observe(add_controls_to_player);
-        app.add_systems(Update, apply_controls);
+        app.add_systems(Update, apply_controls.in_set(During::Gameplay));
+        app.add_systems(OnEnter(AppState::Game), release_jump_input);
     }
 }
 
@@ -129,7 +130,7 @@ fn apply_controls(
                 // input_buffer_time: todo!(),
                 ..Default::default()
             });
-        } else {
+        } else if input.pressed(&PlayerAction::Jump) {
             let jump = input.clamped_value(&PlayerAction::Jump);
             if 0.0 < jump {
                 controller.action(TnuaBuiltinJump {
@@ -148,5 +149,11 @@ fn apply_controls(
                 });
             }
         }
+    }
+}
+
+fn release_jump_input(mut query: Query<&mut ActionState<PlayerAction>>) {
+    for mut controls in query.iter_mut() {
+        controls.consume(&PlayerAction::Jump);
     }
 }

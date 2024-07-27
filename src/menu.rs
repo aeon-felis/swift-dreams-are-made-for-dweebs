@@ -162,7 +162,7 @@ fn main_menu(mut frame_ui: ResMut<FrameUi>, mut next_state: ResMut<NextState<App
         .kbgp_navigation()
         .kbgp_focus_label(FocusLabel::Start)
         .kbgp_initial_focus()
-        .clicked()
+        .kbgp_click_released()
     {
         next_state.set(AppState::LoadLevel);
         ui.kbgp_clear_input();

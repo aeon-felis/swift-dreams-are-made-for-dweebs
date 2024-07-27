@@ -6,7 +6,7 @@
 
 use avian3d::PhysicsPlugins;
 use bevy_egui::EguiPlugin;
-use bevy_egui_kbgp::{KbgpNavBindings, KbgpPlugin, KbgpSettings};
+use bevy_egui_kbgp::{KbgpNavBindings, KbgpNavCommand, KbgpPlugin, KbgpSettings};
 use bevy_tnua::controller::TnuaControllerPlugin;
 use bevy_tnua_avian3d::TnuaAvian3dPlugin;
 use bevy_turborand::prelude::RngPlugin;
@@ -16,7 +16,7 @@ use clap::Parser;
 
 use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
-use swift_dreams_are_made_for_dweebs::SwiftDreamsAreMadeForDweebsPlugin;
+use swift_dreams_are_made_for_dweebs::{ActionForKbgp, SwiftDreamsAreMadeForDweebsPlugin};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -62,24 +62,23 @@ fn main() {
             allow_mouse_wheel_sideways: false,
             allow_gamepads: true,
             bindings: {
-                KbgpNavBindings::default().with_wasd_navigation()
-                /*
-                .with_key(KeyCode::Escape, KbgpNavCommand::user(ActionForKbgp::Menu))
-                .with_key(
-                    KeyCode::Back,
-                    KbgpNavCommand::user(ActionForKbgp::RestartLevel),
-                )
-                .with_key(KeyCode::Space, KbgpNavCommand::Click)
-                .with_key(KeyCode::J, KbgpNavCommand::Click)
-                .with_gamepad_button(
-                    GamepadButtonType::Start,
-                    KbgpNavCommand::user(ActionForKbgp::Menu),
-                )
-                .with_gamepad_button(
-                    GamepadButtonType::Select,
-                    KbgpNavCommand::user(ActionForKbgp::RestartLevel),
-                )
-                */
+                KbgpNavBindings::default()
+                    .with_wasd_navigation()
+                    .with_key(KeyCode::Escape, KbgpNavCommand::user(ActionForKbgp::Menu))
+                    .with_key(
+                        KeyCode::Backspace,
+                        KbgpNavCommand::user(ActionForKbgp::RestartLevel),
+                    )
+                    .with_key(KeyCode::Space, KbgpNavCommand::Click)
+                    .with_key(KeyCode::KeyJ, KbgpNavCommand::Click)
+                    .with_gamepad_button(
+                        GamepadButtonType::Start,
+                        KbgpNavCommand::user(ActionForKbgp::Menu),
+                    )
+                    .with_gamepad_button(
+                        GamepadButtonType::Select,
+                        KbgpNavCommand::user(ActionForKbgp::RestartLevel),
+                    )
             },
         });
     }
