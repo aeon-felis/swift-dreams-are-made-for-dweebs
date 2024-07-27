@@ -6,7 +6,7 @@ use std::{
 use bevy::prelude::*;
 use bevy_turborand::prelude::*;
 
-use crate::dweeb::Dweeb;
+use crate::{dweeb::Dweeb, During};
 
 pub struct DweebEffectsPlugin;
 
@@ -15,7 +15,10 @@ impl Plugin for DweebEffectsPlugin {
         app.observe(add_effect_to_dweeb);
         app.add_systems(
             Update,
-            (handle_effect_discriminant_changes, handle_effect_particles),
+            (
+                handle_effect_discriminant_changes,
+                handle_effect_particles.in_set(During::Gameplay),
+            ),
         );
     }
 }

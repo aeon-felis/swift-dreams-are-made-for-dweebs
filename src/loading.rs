@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_yoleck::prelude::YoleckLoadLevel;
+use bevy_yoleck::prelude::*;
 
 use crate::AppState;
 
@@ -13,9 +13,13 @@ impl Plugin for LoadingPlugin {
 
 fn load_the_level(
     asset_server: Res<AssetServer>,
+    existing_levels_query: Query<Entity, With<YoleckKeepLevel>>,
     mut commands: Commands,
     mut app_state: ResMut<NextState<AppState>>,
 ) {
+    for existing_level in existing_levels_query.iter() {
+        commands.entity(existing_level).despawn_recursive();
+    }
     commands.spawn(YoleckLoadLevel(asset_server.load("levels/Level.yol")));
     app_state.set(AppState::Game);
 }

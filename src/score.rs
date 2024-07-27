@@ -3,19 +3,17 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts};
 
-use crate::During;
+use crate::{AppState, During};
 
 pub struct ScorePlugin;
 
 impl Plugin for ScorePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(GameScore(0));
-        app.insert_resource(GameTime(Timer::new(
-            Duration::from_secs(60),
-            TimerMode::Once,
-        )));
+        app.insert_resource(GameTime(Default::default()));
         app.add_systems(Update, (display_score, handle_score_event));
         app.add_systems(Update, update_time.in_set(During::Gameplay));
+        app.add_systems(OnEnter(AppState::LoadLevel), restart_score_and_timer);
         app.add_event::<IncreaseScore>();
     }
 }
@@ -28,6 +26,12 @@ pub struct IncreaseScore;
 
 #[derive(Resource)]
 pub struct GameTime(Timer);
+
+impl GameTime {
+    pub fn is_finished(&self) -> bool {
+        self.0.finished()
+    }
+}
 
 fn display_score(mut egui_contexts: EguiContexts, score: Res<GameScore>, game_time: Res<GameTime>) {
     let ctx = egui_contexts.ctx_mut();
@@ -61,6 +65,17 @@ fn handle_score_event(mut reader: EventReader<IncreaseScore>, mut score: ResMut<
     }
 }
 
-fn update_time(time: Res<Time>, mut game_time: ResMut<GameTime>) {
-    game_time.0.tick(time.delta());
+fn update_time(
+    time: Res<Time>,
+    mut game_time: ResMut<GameTime>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
+    if game_time.0.tick(time.delta()).finished() {
+        next_state.set(AppState::GameOver);
+    }
+}
+
+fn restart_score_and_timer(mut game_score: ResMut<GameScore>, mut game_time: ResMut<GameTime>) {
+    game_score.0 = 0;
+    game_time.0 = Timer::new(Duration::from_secs(60), TimerMode::Once);
 }

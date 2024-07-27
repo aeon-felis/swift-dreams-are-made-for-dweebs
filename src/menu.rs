@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts};
 use bevy_egui_kbgp::prelude::*;
 
-use crate::{ActionForKbgp, AppState, During};
+use crate::{score::GameTime, ActionForKbgp, AppState, During};
 
 pub struct MenuPlugin;
 
@@ -169,16 +169,29 @@ fn pause_menu(mut frame_ui: ResMut<FrameUi>, mut next_state: ResMut<NextState<Ap
     }
 }
 
-fn game_over_menu(mut frame_ui: ResMut<FrameUi>, mut next_state: ResMut<NextState<AppState>>) {
+fn game_over_menu(
+    mut frame_ui: ResMut<FrameUi>,
+    game_time: Res<GameTime>,
+    mut next_state: ResMut<NextState<AppState>>,
+) {
     let Some(ui) = frame_ui.0.as_mut() else {
         return;
     };
-    ui.label(
-        egui::RichText::new("Game Over")
-            .size(60.0)
-            .strong()
-            .color(egui::Color32::RED),
-    );
+    if game_time.is_finished() {
+        ui.label(
+            egui::RichText::new("Time Out")
+                .size(60.0)
+                .strong()
+                .color(egui::Color32::GREEN),
+        );
+    } else {
+        ui.label(
+            egui::RichText::new("Game Over")
+                .size(60.0)
+                .strong()
+                .color(egui::Color32::RED),
+        );
+    }
     ui.add_space(20.0);
     if ui.kbgp_user_action() == Some(ActionForKbgp::Menu) {
         ui.kbgp_set_focus_label(FocusLabel::BackToMainMenu);
