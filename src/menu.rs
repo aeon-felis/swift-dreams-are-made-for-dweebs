@@ -110,11 +110,35 @@ fn menu_header(mut frame_ui: ResMut<FrameUi>) {
     let Some(ui) = frame_ui.0.as_mut() else {
         return;
     };
-    ui.add_space(50.0);
+    ui.add_space(20.0);
 
     let mut title_text = egui::text::LayoutJob::default();
     title_text.append(
-        "Maze of Many Missiles",
+        "Swift Dreams",
+        0.0,
+        egui::TextFormat {
+            font_id: egui::FontId {
+                size: 40.0,
+                family: egui::FontFamily::Proportional,
+            },
+            color: egui::Color32::WHITE,
+            ..Default::default()
+        },
+    );
+    title_text.append(
+        "\nare Made for",
+        0.0,
+        egui::TextFormat {
+            font_id: egui::FontId {
+                size: 20.0,
+                family: egui::FontFamily::Proportional,
+            },
+            color: egui::Color32::WHITE,
+            ..Default::default()
+        },
+    );
+    title_text.append(
+        "\nDweebs",
         0.0,
         egui::TextFormat {
             font_id: egui::FontId {
@@ -126,7 +150,7 @@ fn menu_header(mut frame_ui: ResMut<FrameUi>) {
         },
     );
     ui.label(title_text);
-    ui.add_space(20.0);
+    ui.add_space(10.0);
 }
 
 fn main_menu(mut frame_ui: ResMut<FrameUi>, mut next_state: ResMut<NextState<AppState>>) {
@@ -180,9 +204,18 @@ fn game_over_menu(
     if game_data.is_finished() {
         ui.label(
             egui::RichText::new("Time Out")
-                .size(60.0)
+                .size(50.0)
                 .strong()
-                .color(egui::Color32::GREEN),
+                .color(egui::Color32::LIGHT_BLUE),
+        );
+        ui.label(
+            egui::RichText::new(format!(
+                "The dweebs have managed\nto scribe {} ideas",
+                game_data.score()
+            ))
+            .size(30.0)
+            .strong()
+            .color(egui::Color32::LIGHT_GREEN),
         );
     } else {
         ui.label(

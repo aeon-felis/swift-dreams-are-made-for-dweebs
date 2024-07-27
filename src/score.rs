@@ -10,8 +10,22 @@ pub struct ScorePlugin;
 impl Plugin for ScorePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(GameData::init());
-        app.add_systems(Update, (display_score, handle_score_event));
-        app.add_systems(Update, update_time.in_set(During::Gameplay));
+        app.add_systems(
+            Update,
+            (
+                display_game_data.run_if(|app_state: Res<State<AppState>>| match app_state.get() {
+                    AppState::MainMenu => false,
+                    AppState::PauseMenu => true,
+                    AppState::LoadLevel => false,
+                    AppState::Editor => false,
+                    AppState::Game => true,
+                    AppState::LevelCompleted => true,
+                    AppState::GameOver => true,
+                }),
+                handle_score_event,
+                update_time.in_set(During::Gameplay),
+            ),
+        );
         app.add_systems(OnEnter(AppState::LoadLevel), restart_score_and_timer);
         app.add_event::<IncreaseScore>();
     }
@@ -32,6 +46,10 @@ impl GameData {
         }
     }
 
+    pub fn score(&self) -> usize {
+        self.score
+    }
+
     pub fn is_finished(&self) -> bool {
         self.time.finished()
     }
@@ -40,12 +58,12 @@ impl GameData {
 #[derive(Event)]
 pub struct IncreaseScore;
 
-fn display_score(mut egui_contexts: EguiContexts, game_data: Res<GameData>) {
+fn display_game_data(mut egui_contexts: EguiContexts, game_data: Res<GameData>) {
     let ctx = egui_contexts.ctx_mut();
     let panel = egui::Area::new("display-score".into()).fixed_pos([0.0, 0.0]);
     panel.show(ctx, |ui| {
         ui.label(
-            egui::RichText::new(format!("Score: {}", game_data.score))
+            egui::RichText::new(format!("Ideas Scribed: {}", game_data.score))
                 .strong()
                 .size(36.0),
         );
