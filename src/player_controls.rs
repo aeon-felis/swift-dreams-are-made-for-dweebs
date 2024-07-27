@@ -102,17 +102,18 @@ fn apply_controls(
                 .iter()
                 .filter_map(|(target_translation, PotentialAttackTarget { offset })| {
                     let vec_to_target = target_translation.translation() - player_position;
-                    if vec_to_target == Vec3::ZERO {
+                    let distance_sq = vec_to_target.length_squared();
+                    if distance_sq < 0.2f32.powi(2) {
+                        return None;
+                    }
+                    if 10.0f32.powi(2) < distance_sq {
                         return None;
                     }
                     let angle = attack_direction.angle_between(vec_to_target).abs();
                     if std::f32::consts::FRAC_PI_2 < angle {
                         return None;
                     }
-                    Some((
-                        vec_to_target.length_squared() * angle,
-                        vec_to_target + *offset,
-                    ))
+                    Some((distance_sq * angle, vec_to_target + *offset))
                 })
                 .min_by_key(|(score, _)| OrderedFloat(*score))
                 .map(|(_, v)| (attack_direction, v))
