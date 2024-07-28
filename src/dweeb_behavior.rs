@@ -111,7 +111,7 @@ fn add_behavior_to_dweeb(trigger: Trigger<OnInsert, Dweeb>, mut commands: Comman
 
 fn suggest_idle(mut query: Query<&mut YoetzAdvisor<DweebBehavior>>) {
     for mut advisor in query.iter_mut() {
-        advisor.suggest(0.0, DweebBehavior::Idle);
+        advisor.suggest(f32::NEG_INFINITY, DweebBehavior::Idle);
     }
 }
 
