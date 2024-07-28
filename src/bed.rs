@@ -15,7 +15,7 @@ impl Plugin for BedPlugin {
                 .with::<Vpeol3dPosition>()
                 .insert_on_init(|| Bed)
         });
-        affix_vpeol_y::<With<Bed>>(app, 2.0);
+        affix_vpeol_y::<With<Bed>>(app, 1.3);
         app.add_systems(YoleckSchedule::Populate, populate_bed);
     }
 }
